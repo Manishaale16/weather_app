@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NepWeather | Professional Weather Insights</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;600;800&display=swap"
+        rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-bg: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.45);
+            --accent-color: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.3);
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --nav-bg: rgba(15, 23, 42, 0.7);
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: #0f172a;
+            background-attachment: fixed;
+            color: var(--text-main);
+            min-height: 100vh;
+            overflow-x: hidden;
+            transition: background 1.5s ease-in-out;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4,
+        .navbar-brand {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        .navbar {
+            background: var(--nav-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--glass-border);
+            padding: 1.25rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .weather-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-radius: 28px;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .weather-card:hover {
+            box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.6);
+        }
+
+        .btn-accent {
+            background: linear-gradient(135deg, var(--accent-color), #0ea5e9);
+            color: #0f172a;
+            font-weight: 700;
+            border-radius: 14px;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            box-shadow: 0 10px 15px -3px var(--accent-glow);
+            transition: all 0.3s ease;
+        }
+
+        .btn-accent:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 20px -3px var(--accent-glow);
+            filter: brightness(1.1);
+        }
+
+        .glass-input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            color: white !important;
+            border-radius: 14px;
+            padding: 0.8rem 1.2rem;
+            transition: all 0.3s ease;
+        }
+
+        .glass-input:focus {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 4px var(--accent-glow);
+            outline: none;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .floating {
+            animation: floating 3s ease-in-out infinite;
+        }
+
+        @keyframes floating {
+            0% {
+                transform: translateY(0px);
+            }
+
+            50% {
+                transform: translateY(-10px);
+            }
+
+            100% {
+                transform: translateY(0px);
+            }
+        }
+
+        .text-accent {
+            color: var(--accent-color);
+        }
+
+        .text-dim {
+            color: var(--text-dim);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--primary-bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--glass-border);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-dim);
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav class="navbar navbar-expand-lg mb-4">
+        <div class="container">
+            <a class="navbar-brand fw-extrabold text-white d-flex align-items-center" href="{% url 'home' %}">
+                <div class="rounded-pill p-1 me-2 d-flex align-items-center justify-content-center"
+                    style="width:40px;height:40px;background: var(--accent-color); box-shadow: 0 0 15px var(--accent-glow);">
+                    <i class="fa-solid fa-cloud-bolt text-dark fs-5"></i>
+                </div>
+                <span style="letter-spacing: -0.5px;">Nep<span class="text-accent">Weather</span></span>
+            </a>
+
+            <div class="ms-auto d-flex align-items-center">
+                {% if user.is_authenticated %}
+                <div class="dropdown me-3">
+                    <button class="btn btn-link text-dim text-decoration-none dropdown-toggle d-flex align-items-center"
+                        type="button" data-bs-toggle="dropdown">
+                        <i class="fa-solid fa-circle-user me-2 fs-5"></i>
+                        <span class="d-none d-md-inline">{{ user.username }}</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end rounded-4 border-0 shadow-lg mt-2"
+                        style="background: rgba(30, 41, 59, 0.95); backdrop-filter: blur(10px);">
+                        <li><a class="dropdown-item py-2" href="{% url 'logout' %}"><i
+                                    class="fa-solid fa-sign-out-alt me-2"></i>Logout</a></li>
+                    </ul>
+                </div>
+                {% else %}
+                <a class="nav-link text-dim me-4 fw-medium" href="{% url 'login' %}">Sign In</a>
+                <a class="btn btn-accent btn-sm px-4" href="{% url 'register' %}">Get Started</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <div class="container pb-5">
+        {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-info alert-dismissible fade show rounded-4 border-0 mb-4 shadow-sm"
+            style="background: rgba(56, 189, 248, 0.1); color: var(--accent-color);">
+            <i class="fa-solid fa-info-circle me-2"></i>{{ message }}
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <footer class="mt-auto py-5 text-center border-top"
+        style="border-color: var(--glass-border) !important; background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(10px);">
+        <div class="container">
+            <div class="d-flex flex-column align-items-center">
+                <div class="mb-3 d-flex align-items-center">
+                    <i class="fa-solid fa-cloud-bolt text-accent me-2"></i>
+                    <span class="fw-bold text-white fs-5">NepWeather</span>
+                </div>
+                <p class="text-dim small mb-4" style="max-width: 400px;">Providing accurate, real-time weather data and
+                    insights powered by advanced meteorological APIs.</p>
+                <div class="d-flex gap-4 mb-4">
+                    <a href="#" class="text-dim hover-accent fs-5"><i class="fa-brands fa-github"></i></a>
+                    <a href="#" class="text-dim hover-accent fs-5"><i class="fa-brands fa-twitter"></i></a>
+                    <a href="#" class="text-dim hover-accent fs-5"><i class="fa-brands fa-linkedin"></i></a>
+                </div>
+                <p class="text-dim opacity-50 small mb-0">&copy; 2026 NepWeather. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+
+</html>

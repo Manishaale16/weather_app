@@ -1,0 +1,476 @@
+﻿{% extends 'base.html' %}
+{% load weather_extras %}
+
+{% block content %}
+<style>
+    .search-section {
+        position: relative;
+        z-index: 10;
+        margin-top: -10px;
+    }
+
+    .hover-scale {
+        transition: transform 0.2s ease;
+    }
+
+    .hover-scale:hover {
+        transform: scale(1.05);
+    }
+
+    .hover-accent:hover {
+        color: var(--accent-color) !important;
+    }
+
+    .stat-box {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--glass-border);
+        border-radius: 20px;
+        padding: 1.25rem;
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+
+    .stat-box:hover {
+        background: rgba(255, 255, 255, 0.06);
+        border-color: var(--accent-color);
+        transform: translateY(-5px);
+    }
+
+    .forecast-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--glass-border);
+        border-radius: 24px;
+        transition: all 0.3s ease;
+    }
+
+    .forecast-card:hover {
+        background: rgba(255, 255, 255, 0.07);
+        border-color: var(--accent-color);
+    }
+
+    .bg-glow {
+        position: absolute;
+        top: -100px;
+        right: -100px;
+        width: 300px;
+        height: 300px;
+        background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+        z-index: 0;
+        pointer-events: none;
+    }
+
+    .shadow-text {
+        text-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .weather-icon-large {
+        filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2));
+        width: 160px;
+    }
+
+    .unit-toggle {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--glass-border);
+        border-radius: 30px;
+        padding: 4px;
+        display: inline-flex;
+    }
+
+    .unit-toggle a {
+        padding: 6px 16px;
+        border-radius: 26px;
+        text-decoration: none;
+        color: var(--text-dim);
+        font-size: 0.85rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+
+    .unit-toggle a.active {
+        background: var(--accent-color);
+        color: #0f172a;
+        box-shadow: 0 4px 10px var(--accent-glow);
+    }
+
+    .favorite-item {
+        transition: all 0.2s ease;
+        border-radius: 12px;
+    }
+
+    .favorite-item:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
+</style>
+
+<div class="row g-4">
+    <!-- Left Panel -->
+    <div class="col-lg-4">
+        <div class="weather-card p-4 h-100 fade-in">
+            <h4 class="mb-4 fw-bold d-flex align-items-center">
+                <i class="fa-solid fa-earth-asia me-2 text-accent"></i>Explore
+            </h4>
+
+            <form action="{% url 'home' %}" method="get" class="mb-4">
+                <div class="input-group">
+                    <input type="text" id="cityInput" name="city" class="form-control glass-input"
+                        placeholder="Search city..." value="{{ city|default:'' }}" required>
+                    <button class="btn btn-outline-light border-0 px-3 bg-transparent" type="button"
+                        onclick="getCurrentLocation()" title="Use Current Location">
+                        <i class="fa-solid fa-location-crosshairs text-accent"></i>
+                    </button>
+                    <button class="btn btn-accent px-4" type="submit">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </button>
+                </div>
+            </form>
+
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <span class="text-dim small fw-medium">Display Units</span>
+                <div class="unit-toggle">
+                    <a href="{% if units == 'imperial' %}{% url 'toggle_unit' %}{% else %}#{% endif %}"
+                        class="{% if units == 'metric' %}active{% endif %}">Celsius</a>
+                    <a href="{% if units == 'metric' %}{% url 'toggle_unit' %}{% else %}#{% endif %}"
+                        class="{% if units == 'imperial' %}active{% endif %}">Fahrenheit</a>
+                </div>
+            </div>
+
+            {% if user.is_authenticated %}
+            <div class="mt-5">
+                <h6 class="text-uppercase text-dim fs-xs fw-bold mb-3"
+                    style="letter-spacing: 1.5px; font-size: 0.7rem;">Saved Locations</h6>
+                <div class="list-group list-group-flush bg-transparent">
+                    {% for f in favorites %}
+                    <div
+                        class="list-group-item bg-transparent border-0 px-0 d-flex justify-content-between align-items-center favorite-item mb-1 px-2">
+                        <a href="?city={{ f.city }}" class="text-white text-decoration-none hover-accent fw-medium">
+                            {{ f.city }}
+                        </a>
+                        <a href="{% url 'remove_favorite' f.city %}" class="text-dim hover-danger opacity-50">
+                            <i class="fa-solid fa-xmark"></i>
+                        </a>
+                    </div>
+                    {% empty %}
+                    <div class="text-center py-3 opacity-50">
+                        <i class="fa-solid fa-heart-crack d-block mb-2 fs-4"></i>
+                        <span class="small">No favorites yet</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="mt-5">
+                <h6 class="text-uppercase text-dim fw-bold mb-3" style="letter-spacing: 1.5px; font-size: 0.7rem;">
+                    Recently Viewed</h6>
+                <div class="d-flex flex-wrap gap-2">
+                    {% for h in history %}
+                    <a href="?city={{ h.city }}"
+                        class="badge rounded-pill text-decoration-none py-2 px-3 hover-scale fw-medium"
+                        style="background: rgba(255,255,255,0.05); color: var(--text-main); border: 1px solid var(--glass-border);">
+                        {{ h.city }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <div class="weather-card p-3 mt-4 text-center" style="background: rgba(56, 189, 248, 0.05);">
+                <i class="fa-solid fa-circle-info text-accent mb-2"></i>
+                <p class="small text-dim mb-0">Sign in to save your favorite cities and view search history.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Right Panel -->
+    <div class="col-lg-8">
+        {% if error %}
+        <div class="weather-card p-5 text-center fade-in">
+            <div class="rounded-circle bg-danger bg-opacity-10 d-inline-flex p-4 mb-4">
+                <i class="fa-solid fa-triangle-exclamation fa-3x text-danger"></i>
+            </div>
+            <h3 class="text-white mb-2">Location Not Found</h3>
+            <p class="text-dim">{{ error }}</p>
+            <a href="{% url 'home' %}" class="btn btn-outline-light rounded-pill px-4 mt-3">Try Again</a>
+        </div>
+
+        {% elif weather %}
+        <!-- Weather Alerts -->
+        {% if weather.alerts %}
+        {% for alert in weather.alerts %}
+        <div class="alert alert-warning border-0 rounded-4 mb-4 fade-in shadow-sm d-flex align-items-center"
+            style="background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444 !important;">
+            <i class="fa-solid fa-bolt-lightning text-danger me-3 fs-4"></i>
+            <div class="flex-grow-1">
+                <strong class="text-white small text-uppercase" style="letter-spacing: 1px;">Weather Alert</strong>
+                <p class="mb-0 text-white-50 small">{{ alert.headline }}</p>
+            </div>
+            <button class="btn btn-sm btn-link text-white text-decoration-none fw-bold" type="button"
+                data-bs-toggle="collapse" data-bs-target="#alertDesc{{ forloop.counter }}">
+                Read <i class="fa-solid fa-chevron-down ms-1"></i>
+            </button>
+        </div>
+        <div class="collapse mb-4" id="alertDesc{{ forloop.counter }}">
+            <div class="weather-card p-3 small text-dim border-danger border-opacity-25">
+                {{ alert.description }}
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <!-- Current Weather -->
+        <div class="weather-card p-4 p-md-5 mb-4 position-relative overflow-hidden fade-in">
+            <div class="bg-glow"></div>
+
+            <div class="row align-items-center position-relative z-1">
+                <div class="col-md-7">
+                    <div class="d-flex align-items-start gap-2 mb-2">
+                        <h1 class="display-1 fw-bold mb-0 text-white shadow-text" style="letter-spacing: -2px;">
+                            {{ weather.current.temp }}
+                        </h1>
+                    </div>
+
+                    <div class="mb-4">
+                        <h2 class="h2 mb-1 text-white fw-bold">
+                            {{ weather.city }}<span class="text-accent">,</span> {{ weather.country }}
+                        </h2>
+                        <div class="d-flex align-items-center gap-3">
+                            <span class="text-dim fs-5">{{ weather.current.condition }}</span>
+                            <span class="text-accent fw-medium px-2 py-1 rounded-pill small bg-accent bg-opacity-10">
+                                Feels like {{ weather.current.feels_like }}
+                            </span>
+                        </div>
+                    </div>
+
+                    {% if user.is_authenticated %}
+                    {% if is_favorite %}
+                    <a href="{% url 'remove_favorite' weather.city %}"
+                        class="btn btn-danger btn-sm rounded-pill px-4 shadow-sm fw-bold">
+                        <i class="fa-solid fa-heart me-2"></i>Unsave
+                    </a>
+                    {% else %}
+                    <a href="{% url 'add_favorite' weather.city %}"
+                        class="btn btn-outline-light btn-sm rounded-pill px-4 fw-bold">
+                        <i class="fa-regular fa-heart me-2"></i>Save City
+                    </a>
+                    {% endif %}
+                    {% endif %}
+                </div>
+
+                <div class="col-md-5 text-center mt-4 mt-md-0">
+                    <img src="{{ weather.current.icon }}" alt="Weather Icon" class="weather-icon-large floating">
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="row g-3 mt-5 position-relative z-1">
+                <div class="col-6 col-md-3">
+                    <div class="stat-box">
+                        <i class="fa-solid fa-droplet text-info mb-3 fs-4"></i>
+                        <p class="text-dim small mb-1">Humidity</p>
+                        <h5 class="fw-bold mb-0 text-white">{{ weather.current.humidity }}</h5>
+                    </div>
+                </div>
+
+                <div class="col-6 col-md-3">
+                    <div class="stat-box">
+                        <i class="fa-solid fa-wind text-accent mb-3 fs-4"></i>
+                        <p class="text-dim small mb-1">Wind Speed</p>
+                        <h5 class="fw-bold mb-0 text-white">{{ weather.current.wind_speed }}</h5>
+                    </div>
+                </div>
+
+                <div class="col-6 col-md-3">
+                    <div class="stat-box">
+                        <i class="fa-solid fa-sun text-warning mb-3 fs-4"></i>
+                        <p class="text-dim small mb-1">UV Index</p>
+                        <h5 class="fw-bold mb-0 text-white">{{ weather.current.uv }}</h5>
+                    </div>
+                </div>
+
+                <div class="col-6 col-md-3">
+                    <div class="stat-box">
+                        <i class="fa-solid fa-eye text-success mb-3 fs-4"></i>
+                        <p class="text-dim small mb-1">Visibility</p>
+                        <h5 class="fw-bold mb-0 text-white">{{ weather.current.visibility }}</h5>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Temperature Trend Chart -->
+        <div class="weather-card p-4 mb-4 fade-in">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="mb-0 fw-bold d-flex align-items-center">
+                    <i class="fa-solid fa-chart-line me-2 text-accent"></i>
+                    Forecast Trend
+                </h5>
+                <span class="text-dim small">Next 5 Days</span>
+            </div>
+            <div style="height: 300px;">
+                <canvas id="forecastChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Forecast Grid -->
+        <h5 class="mb-3 fw-bold mt-5 px-3">
+            <i class="fa-solid fa-calendar-day me-2 text-accent"></i>5-Day Outlook
+        </h5>
+
+        <div class="row g-3 mb-5 px-1">
+            {% for d in weather.forecast %}
+            <div class="col">
+                <div class="forecast-card p-3 text-center h-100">
+                    <p class="mb-1 text-dim small fw-bold text-uppercase" style="letter-spacing: 1px;">
+                        {% if forloop.first %}Today{% else %}{{ d.date }}{% endif %}
+                    </p>
+                    <img src="{{ d.icon }}" alt="icon" width="60" class="my-1">
+                    <h4 class="mb-0 fw-bold text-white">{{ d.temp }}</h4>
+                    <p class="small text-dim mb-2 mt-1">{{ d.condition }}</p>
+                    <div class="small fw-semibold text-info mt-auto">
+                        <i class="fa-solid fa-droplet me-1"></i>{{ d.rain_chance }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <!-- Welcome Screen -->
+        <div class="weather-card p-5 text-center fade-in">
+            <div class="position-relative mb-5 d-inline-block">
+                <div class="rounded-circle bg-accent bg-opacity-10 position-absolute top-50 start-50 translate-middle"
+                    style="width: 150px; height: 150px;"></div>
+                <i class="fa-solid fa-cloud-sun fa-5x text-accent floating position-relative"></i>
+            </div>
+            <h2 class="text-white fw-extrabold mb-3 display-6">Intelligent Weather Forecasts</h2>
+            <p class="text-dim fs-5 mx-auto mb-5" style="max-width: 500px;">
+                Access real-time weather analytics and precise 5-day forecasts for cities worldwide with our premium
+                meteorological platform.
+            </p>
+            <div class="d-flex flex-wrap justify-content-center gap-2">
+                {% for city_name in "Kathmandu,London,New York,Tokyo,Paris"|split:"," %}
+                <a href="?city={{ city_name }}"
+                    class="btn btn-outline-light rounded-pill px-3 py-2 btn-sm opacity-75 hover-scale">
+                    {{ city_name }}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    function getCurrentLocation() {
+        const btn = event.currentTarget;
+        const icon = btn.querySelector("i");
+        if (navigator.geolocation) {
+            icon.className = "fa-solid fa-spinner fa-spin text-accent";
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    window.location.href = `/?city=${lat},${lon}`;
+                },
+                (error) => {
+                    icon.className = "fa-solid fa-location-crosshairs text-accent";
+                    alert("Unable to retrieve your location. Please ensure location permissions are enabled.");
+                }
+            );
+        } else {
+            alert("Geolocation is not supported by this browser.");
+        }
+    }
+</script>
+
+{% if weather %}
+{{ weather.raw_temps|json_script:"weather-temps" }}
+{{ weather.forecast|json_script:"weather-forecast" }}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const tempData = JSON.parse(document.getElementById('weather-temps').textContent);
+        const forecastData = JSON.parse(document.getElementById('weather-forecast').textContent);
+        const labels = forecastData.map(d => d.date);
+
+        const conditionCode = parseInt("{{ weather.current.condition_code|default:1000 }}");
+        const body = document.body;
+        let bgGradient = "#0f172a";
+
+        // Clear Sky
+        if (conditionCode === 1000) bgGradient = "radial-gradient(circle at top right, #0ea5e9, #0f172a)";
+        // Clouds
+        else if ([1003, 1006, 1009].includes(conditionCode)) bgGradient = "radial-gradient(circle at top right, #334155, #0f172a)";
+        // Rain
+        else if ([1150, 1153, 1180, 1183, 1186, 1189, 1192, 1195, 1240, 1243].includes(conditionCode)) bgGradient = "radial-gradient(circle at top right, #1e293b, #0c111d)";
+        // Snow
+        else if ([1210, 1213, 1216, 1219, 1222, 1225, 1255, 1258].includes(conditionCode)) bgGradient = "radial-gradient(circle at top right, #475569, #1e293b)";
+        // Storm
+        else if ([1087, 1273, 1276, 1279, 1282].includes(conditionCode)) bgGradient = "radial-gradient(circle at top right, #312e81, #0f172a)";
+
+        body.style.background = bgGradient;
+
+        const canvas = document.getElementById("forecastChart");
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+
+        const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+        gradient.addColorStop(0, "rgba(56, 189, 248, 0.4)");
+        gradient.addColorStop(1, "rgba(56, 189, 248, 0)");
+
+        new Chart(ctx, {
+            type: "line",
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: "Avg Temp",
+                    data: tempData,
+                    borderColor: "#38bdf8",
+                    backgroundColor: gradient,
+                    borderWidth: 4,
+                    pointBackgroundColor: "#38bdf8",
+                    pointBorderColor: "#fff",
+                    pointBorderWidth: 2,
+                    pointRadius: 6,
+                    pointHoverRadius: 8,
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: "rgba(15, 23, 42, 0.95)",
+                        padding: 12,
+                        titleFont: { family: "Outfit", size: 14, weight: 'bold' },
+                        bodyFont: { family: "Outfit", size: 13 },
+                        displayColors: false,
+                        cornerRadius: 12,
+                        callbacks: {
+                            label: (context) => `Temperature: ${context.parsed.y}°`
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        grid: { color: "rgba(255,255,255,0.05)", drawBorder: false },
+                        ticks: {
+                            color: "#94a3b8",
+                            font: { family: "Outfit", size: 12 },
+                            callback: (value) => value + "°"
+                        }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: "#94a3b8", font: { family: "Outfit", size: 12 } }
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endif %}
+{% endblock %}
