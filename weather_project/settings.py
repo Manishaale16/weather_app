@@ -1,4 +1,5 @@
 import os
+import dj_database_url
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -12,7 +13,10 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 
 # Security: Set ALLOWED_HOSTS in .env (e.g., ALLOWED_HOSTS=nepweather.up.railway.app,localhost)
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost,.onrender.com").split(",")
+
+# CSRF Trusted Origins for Render
+CSRF_TRUSTED_ORIGINS = [f"https://{host}" for host in ALLOWED_HOSTS if host and not host.startswith(('localhost', '127.0.0.1'))]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -52,8 +56,10 @@ TEMPLATES = [
 ]
 
 DATABASES = {
-    'default': {'ENGINE': 'django.db.backends.sqlite3',
-                'NAME': BASE_DIR / 'db.sqlite3'}
+    'default': dj_database_url.config(
+        default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
+        conn_max_age=600
+    )
 }
 
 # Static files (CSS, JavaScript, Images)
